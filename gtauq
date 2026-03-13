@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flashcard PPU UTBK</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Tambahan efek 3D untuk membalik kartu */
+    .perspective-1000 { perspective: 1000px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // --- Pengganti Ikon agar tidak perlu install Lucide ---
+    const BookOpen = ({size, className}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+    const RotateCcw = ({size, className}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+    const CheckCircle2 = ({size, className}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>;
+    const ArrowLeft = ({size, className}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>;
+    const ArrowRight = ({size, className}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>;
+    const Shuffle = ({size, className}) => <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>;
+
+    // --- Data Flashcard (250 Kata Baku & Tidak Baku) ---
+    const initialFlashcards = [
+      { id: 1, word1: "Apotek", word2: "Apotik", answer: "Apotek", explanation: "Berasal dari bahasa Belanda 'apotheek'. Ingat profesinya adalah 'Apoteker', bukan 'Apotiker'." },
+      { id: 2, word1: "Nasihat", word2: "Nasehat", answer: "Nasihat", explanation: "Berasal dari bahasa Arab yang menggunakan huruf 'i' (nashihah)." },
+      { id: 3, word1: "Risiko", word2: "Resiko", answer: "Risiko", explanation: "Kata serapan dari bahasa Inggris 'risk', sehingga diserap menjadi 'risiko', bukan 'resiko'." },
+      { id: 4, word1: "Antri", word2: "Antre", answer: "Antre", explanation: "Kata bakunya adalah antre (berakhiran -e). Sama seperti 'Antrean', bukan 'Antrian'." },
+      { id: 5, word1: "Praktek", word2: "Praktik", answer: "Praktik", explanation: "Ingat kata turunannya: Praktikum. Jadi yang benar adalah Praktik, bukan Praktek." },
+      { id: 6, word1: "Ijasah", word2: "Ijazah", answer: "Ijazah", explanation: "Berasal dari bahasa Arab, penulisan baku menggunakan huruf 'z'." },
+      { id: 7, word1: "Karir", word2: "Karier", answer: "Karier", explanation: "Diserap dari bahasa Belanda 'carriere', maka yang baku adalah Karier." },
+      { id: 8, word1: "Jadual", word2: "Jadwal", answer: "Jadwal", explanation: "Penulisan baku menggunakan huruf 'w', yaitu jadwal." },
+      { id: 9, word1: "Zaman", word2: "Jaman", answer: "Zaman", explanation: "Diserap dari bahasa Arab. Penulisan yang benar menggunakan huruf 'z'." },
+      { id: 10, word1: "Sistem", word2: "Sistim", answer: "Sistem", explanation: "Diserap dari bahasa Inggris 'system'. Vokal 'e' tetap dipertahankan." },
+      { id: 11, word1: "Kualitas", word2: "Kwalitas", answer: "Kualitas", explanation: "Gabungan huruf 'kw' sudah tidak digunakan dan diganti menjadi 'ku'." },
+      { id: 12, word1: "Kwitansi", word2: "Kuitansi", answer: "Kuitansi", explanation: "Sama seperti kualitas, gabungan 'kw' diganti menjadi 'ku'. Jadi, kuitansi." },
+      { id: 13, word1: "Detil", word2: "Detail", answer: "Detail", explanation: "Penulisan yang baku tetap mempertahankan bentuk aslinya yaitu detail." },
+      { id: 14, word1: "Autentik", word2: "Otentik", answer: "Autentik", explanation: "Diserap dari bahasa Yunani 'authentikos', maka yang baku menggunakan 'au'." },
+      { id: 15, word1: "Saksama", word2: "Seksama", answer: "Saksama", explanation: "Artinya teliti atau cermat. Penulisan bakunya menggunakan huruf 'a'." },
+      { id: 16, word1: "Kadaluwarsa", word2: "Kedaluwarsa", answer: "Kedaluwarsa", explanation: "Berasal dari bahasa Jawa. Awalan yang benar adalah 'ke-', bukan 'ka-'." },
+      { id: 17, word1: "Elit", word2: "Elite", answer: "Elite", explanation: "Kata bakunya menggunakan akhiran 'e', dibaca elit tapi ditulis elite." },
+      { id: 18, word1: "Aktivitas", word2: "Aktifitas", answer: "Aktivitas", explanation: "Kata dasarnya 'aktif' (pakai f), tapi jika mendapat akhiran -itas, diserap dari 'activity' menjadi aktivitas (pakai v)." },
+      { id: 19, word1: "Utang", word2: "Hutang", answer: "Utang", explanation: "Kata asli bahasa Indonesia (Melayu). Yang baku adalah utang tanpa huruf 'h'." },
+      { id: 20, word1: "Imbau", word2: "Himbau", answer: "Imbau", explanation: "Sama seperti utang, yang baku adalah imbau (tanpa h)." },
+      { id: 21, word1: "Ekstrim", word2: "Ekstrem", answer: "Ekstrem", explanation: "Diserap dari bahasa Inggris 'extreme', huruf 'e' di akhir tetap dipertahankan." },
+      { id: 22, word1: "Kiai", word2: "Kyai", answer: "Kiai", explanation: "Sistem ejaan bahasa Indonesia menghindari penggunaan huruf 'y' di tengah kata jika bisa diganti 'i'." },
+      { id: 23, word1: "Lubang", word2: "Lobang", answer: "Lubang", explanation: "Kata baku yang terdaftar di KBBI menggunakan huruf 'u'." },
+      { id: 24, word1: "Paham", word2: "Faham", answer: "Paham", explanation: "Diserap ke bahasa Indonesia menggunakan huruf 'p', bukan 'f'." },
+      { id: 25, word1: "Nafas", word2: "Napas", answer: "Napas", explanation: "Meskipun sering diucapkan dengan 'f', penulisan baku di KBBI menggunakan 'p'." },
+      { id: 26, word1: "Silakan", word2: "Silahkan", answer: "Silakan", explanation: "Kata dasarnya adalah 'sila', bukan 'silah'. Jadi yang benar ditambah akhiran -kan menjadi silakan." },
+      { id: 27, word1: "Sekedar", word2: "Sekadar", answer: "Sekadar", explanation: "Berasal dari kata dasar 'kadar'. Mendapat awalan se- menjadi sekadar." },
+      { id: 28, word1: "Pikir", word2: "Fikir", answer: "Pikir", explanation: "Diserap dari bahasa Arab 'fikr', namun disesuaikan dengan ejaan bahasa Indonesia menjadi pikir." },
+      { id: 29, word1: "Izin", word2: "Ijin", answer: "Izin", explanation: "Kata serapan dari bahasa Arab yang penulisannya di KBBI menggunakan huruf 'z'." },
+      { id: 30, word1: "Analisa", word2: "Analisis", answer: "Analisis", explanation: "Kata serapan dari bahasa Inggris 'analysis' dengan akhiran -is." },
+      { id: 31, word1: "Asas", word2: "Azas", answer: "Asas", explanation: "Penulisan yang baku menurut KBBI adalah asas." },
+      { id: 32, word1: "Cokelat", word2: "Coklat", answer: "Cokelat", explanation: "Berasal dari bahasa Belanda 'chocolade' atau Inggris 'chocolate', diserap menjadi cokelat." },
+      { id: 33, word1: "Diagnosa", word2: "Diagnosis", answer: "Diagnosis", explanation: "Sama seperti analisis, serapan ini menggunakan akhiran -is." },
+      { id: 34, word1: "Frustasi", word2: "Frustrasi", answer: "Frustrasi", explanation: "Berasal dari kata 'frustration', sehingga huruf 'r' kedua tetap ada." },
+      { id: 35, word1: "Hafal", word2: "Apal", answer: "Hafal", explanation: "Berasal dari bahasa Arab, penulisan bakunya menggunakan huruf 'h' dan 'f'." },
+      { id: 36, word1: "Hierarki", word2: "Hirarki", answer: "Hierarki", explanation: "Diserap dari 'hierarchy'. Vokal 'e' di tengah dipertahankan." },
+      { id: 37, word1: "Konkret", word2: "Konkrit", answer: "Konkret", explanation: "Diserap dari bahasa Belanda 'concreet', menjadi konkret." },
+      { id: 38, word1: "Kreativitas", word2: "Kreatifitas", answer: "Kreativitas", explanation: "Sama seperti 'aktivitas', serapan dari 'creativity' berakhiran -ivitas." },
+      { id: 39, word1: "Miliar", word2: "Milyar", answer: "Miliar", explanation: "Penulisan baku yang sesuai ejaan bahasa Indonesia adalah miliar." },
+      { id: 40, word1: "Provinsi", word2: "Propinsi", answer: "Provinsi", explanation: "Diserap dari 'province', penulisan menggunakan huruf 'v'." },
+      { id: 41, word1: "Telantar", word2: "Terlantar", answer: "Telantar", explanation: "Kata dasarnya lantar, mendapat awalan te-. Huruf 'r' lebur karena bertemu 'l'." },
+      { id: 42, word1: "Teoretis", word2: "Teoritis", answer: "Teoretis", explanation: "Diserap dari 'theoretical' (teori), menjadi teoretis bukan teoritis." },
+      { id: 43, word1: "Terampil", word2: "Trampil", answer: "Terampil", explanation: "Penulisan baku menyertakan huruf 'e', yaitu terampil." },
+      { id: 44, word1: "Ustaz", word2: "Ustad", answer: "Ustaz", explanation: "Berasal dari bahasa Arab, penulisan yang benar menurut KBBI adalah ustaz." },
+      { id: 45, word1: "Gua", word2: "Goa", answer: "Gua", explanation: "Kata baku untuk lubang besar di batu karang menurut KBBI adalah gua." },
+      { id: 46, word1: "Februari", word2: "Pebruari", answer: "Februari", explanation: "Nama bulan diserap dari 'February' sehingga menggunakan huruf 'F'." },
+      { id: 47, word1: "Cendekiawan", word2: "Cendikiawan", answer: "Cendekiawan", explanation: "Berasal dari kata dasar cendekia. Huruf yang benar adalah 'e' di tengah." },
+      { id: 48, word1: "Baterai", word2: "Batere", answer: "Baterai", explanation: "Kata bakunya diserap menjadi baterai (berakhiran -ai)." },
+      { id: 49, word1: "Ambulans", word2: "Ambulan", answer: "Ambulans", explanation: "Berasal dari kata 'ambulance', huruf 's' di akhir diserap menjadi ambulans." },
+      { id: 50, word1: "Mengubah", word2: "Merubah", answer: "Mengubah", explanation: "Kata dasarnya 'ubah', ditambah awalan me- menjadi mengubah. (Tidak ada kata dasar 'rubah')." },
+      { id: 51, word1: "Andal", word2: "Handal", answer: "Andal", explanation: "Menurut KBBI, penulisan yang benar adalah andal tanpa awalan huruf 'H'." },
+      { id: 52, word1: "Antarkota", word2: "Antar kota", answer: "Antarkota", explanation: "Bentuk terikat 'antar-' jika digabungkan dengan kata dasar harus ditulis serangkai (digabung)." },
+      { id: 53, word1: "Balsam", word2: "Balsem", answer: "Balsam", explanation: "Diserap dari kata 'balsam', penulisan bakunya menggunakan huruf 'a', bukan 'e'." },
+      { id: 54, word1: "Batalion", word2: "Batalyon", answer: "Batalion", explanation: "Sistem ejaan bahasa Indonesia mengubah bunyi 'y' pada kata serapan asing menjadi 'i'." },
+      { id: 55, word1: "Cecak", word2: "Cicak", answer: "Cecak", explanation: "Sering diucapkan cicak, tapi di KBBI kata bakunya adalah cecak." },
+      { id: 56, word1: "Cendera mata", word2: "Cenderamata", answer: "Cendera mata", explanation: "Ditulis terpisah karena terdiri dari dua kata yang berdiri sendiri (cendera dan mata)." },
+      { id: 57, word1: "Cengkeram", word2: "Cengkram", answer: "Cengkeram", explanation: "Terdapat sisipan huruf 'e' di tengahnya, menjadi cengkeram." },
+      { id: 58, word1: "Cengkih", word2: "Cengkeh", answer: "Cengkih", explanation: "Penulisan baku untuk rempah-rempah ini di KBBI menggunakan huruf 'i', yaitu cengkih." },
+      { id: 59, word1: "Debit", word2: "Debet", answer: "Debit", explanation: "Kata bakunya adalah debit, sama seperti penulisan bahasa aslinya 'debit'." },
+      { id: 60, word1: "Ekstrakurikuler", word2: "Ekstra kurikuler", answer: "Ekstrakurikuler", explanation: "Sama seperti 'antar-', bentuk terikat 'ekstra-' harus ditulis serangkai dengan kata dasarnya." },
+      { id: 61, word1: "Faksimile", word2: "Faksimili", answer: "Faksimile", explanation: "Diserap dari 'facsimile', huruf e di akhir tetap dipertahankan." },
+      { id: 62, word1: "Familier", word2: "Familiar", answer: "Familier", explanation: "Diserap ke bahasa Indonesia menjadi familier (berakhiran -er), bukan familiar." },
+      { id: 63, word1: "Fondasi", word2: "Pondasi", answer: "Fondasi", explanation: "Diserap dari bahasa Belanda 'fundering' atau Inggris 'foundation', bakunya huruf F." },
+      { id: 64, word1: "Fotokopi", word2: "Foto kopi", answer: "Fotokopi", explanation: "Ditulis serangkai dan diserap penuh ke dalam ejaan bahasa Indonesia (c menjadi k, y menjadi i)." },
+      { id: 65, word1: "Frasa", word2: "Frase", answer: "Frasa", explanation: "Diserap dari bahasa Belanda 'frase', namun disesuaikan berakhiran 'a' menjadi frasa." },
+      { id: 66, word1: "Geladi", word2: "Gladi", answer: "Geladi", explanation: "Ada sisipan vokal 'e'. Yang baku adalah geladi (contoh: geladi bersih)." },
+      { id: 67, word1: "Genius", word2: "Jenius", answer: "Genius", explanation: "Dipertahankan bentuk aslinya dari bahasa Latin 'genius', diucapkan jenius tapi ditulis genius." },
+      { id: 68, word1: "Gereget", word2: "Greget", answer: "Gereget", explanation: "Sama seperti geladi, penulisan bakunya menyisipkan huruf 'e'." },
+      { id: 69, word1: "Hektare", word2: "Hektar", answer: "Hektare", explanation: "Berasal dari bahasa Belanda 'hectare', huruf 'e' di akhir tetap ditulis." },
+      { id: 70, word1: "Higienis", word2: "Higenis", answer: "Higienis", explanation: "Berasal dari 'hygiene', jadi huruf 'i' setelah 'g' harus tetap ada (higienis)." },
+      { id: 71, word1: "Hipotesis", word2: "Hipotesa", answer: "Hipotesis", explanation: "Serapan dari bahasa Yunani 'hypothesis', berakhiran -is (seperti analisis, sintesis)." },
+      { id: 72, word1: "Indra", word2: "Indera", answer: "Indra", explanation: "Tidak memakai sisipan 'e'. Langsung ditulis indra (contoh: pancaindra)." },
+      { id: 73, word1: "Interogasi", word2: "Introgasi", answer: "Interogasi", explanation: "Berasal dari 'interrogation', ada huruf 'e' di tengahnya (inter-ogasi)." },
+      { id: 74, word1: "Isap", word2: "Hisap", answer: "Isap", explanation: "Kata bakunya tidak menggunakan huruf 'H'. Sama seperti utang dan imbau." },
+      { id: 75, word1: "Jagat", word2: "Jagad", answer: "Jagat", explanation: "Kata bakunya menggunakan akhiran huruf 't', bukan 'd'." },
+      { id: 76, word1: "Jemaah", word2: "Jamaah", answer: "Jemaah", explanation: "Penulisan serapan yang baku menggunakan huruf 'e'." },
+      { id: 77, word1: "Jenderal", word2: "Jendral", answer: "Jenderal", explanation: "Terdapat sisipan huruf 'e' (jen-de-ral)." },
+      { id: 78, word1: "Karismatik", word2: "Kharismatik", answer: "Karismatik", explanation: "Gabungan huruf 'kh' pada kata ini diserap cukup menjadi 'k' saja (karisma)." },
+      { id: 79, word1: "Kaus", word2: "Kaos", answer: "Kaus", explanation: "Penulisan baku untuk pakaian atau alas kaki adalah kaus (kaus kaki, kaus oblong)." },
+      { id: 80, word1: "Khawatir", word2: "Kuatir", answer: "Khawatir", explanation: "Diserap dari bahasa Arab, penulisan bakunya harus memakai awalan 'kh'." },
+      { id: 81, word1: "Komoditas", word2: "Komoditi", answer: "Komoditas", explanation: "Akhiran '-ity' (commodity) dalam bahasa Indonesia diserap menjadi '-itas' (komoditas)." },
+      { id: 82, word1: "Legalisasi", word2: "Legalisir", answer: "Legalisasi", explanation: "Akhiran '-ir' khas bahasa Belanda diganti menjadi akhiran '-asi' dalam bahasa Indonesia." },
+      { id: 83, word1: "Lembap", word2: "Lembab", answer: "Lembap", explanation: "Berakhiran huruf 'p', bukan 'b'." },
+      { id: 84, word1: "Manajemen", word2: "Managemen", answer: "Manajemen", explanation: "Diserap dari 'management'. Huruf 'g' yang dibaca 'j' diserap menjadi huruf 'j'." },
+      { id: 85, word1: "Mangkuk", word2: "Mangkok", answer: "Mangkuk", explanation: "Bentuk baku di KBBI menggunakan vokal 'u'." },
+      { id: 86, word1: "Memesona", word2: "Mempesona", answer: "Memesona", explanation: "Kata dasar 'pesona' berawalan P. Jika diberi awalan me-, huruf P harus lebur/hilang." },
+      { id: 87, word1: "Merek", word2: "Merk", answer: "Merek", explanation: "Diserap dari bahasa Belanda 'merk', namun diberi sisipan 'e' menjadi merek." },
+      { id: 88, word1: "Meterai", word2: "Materai", answer: "Meterai", explanation: "Kata bakunya menggunakan huruf 'e' di awal, bukan 'a' (meterai)." },
+      { id: 89, word1: "Mencolok", word2: "Menyolok", answer: "Mencolok", explanation: "Kata dasar berawalan huruf 'c' (colok) TIDAK luluh ketika mendapat awalan me-." },
+      { id: 90, word1: "Nakhoda", word2: "Nahkoda", answer: "Nakhoda", explanation: "Penulisan baku menggunakan gabungan huruf 'kh', bukan 'hk'." },
+      { id: 91, word1: "Omzet", word2: "Omset", answer: "Omzet", explanation: "Diserap dari bahasa Belanda 'omzet', penulisan yang baku tetap mempertahankan huruf 'z'." },
+      { id: 92, word1: "Perajin", word2: "Pengrajin", answer: "Perajin", explanation: "Kata dasarnya 'rajin'. Awalan 'pe-' bertemu 'r' tidak menjadi 'peng-', tetap 'perajin'." },
+      { id: 93, word1: "Persentase", word2: "Prosentase", answer: "Persentase", explanation: "Berasal dari kata 'persen' (percent), sehingga menjadi persentase." },
+      { id: 94, word1: "Ramadan", word2: "Ramadhan", answer: "Ramadan", explanation: "Dalam KBBI, penyerapan bunyi huruf hijaiyah 'dhad' cukup diserap menjadi 'd', tanpa 'h'." },
+      { id: 95, word1: "Respons", word2: "Respon", answer: "Respons", explanation: "Diserap dari 'response', huruf 's' di belakang harus dipertahankan." },
+      { id: 96, word1: "Saraf", word2: "Syaraf", answer: "Saraf", explanation: "Kata bakunya adalah saraf tanpa menggunakan huruf 'y'." },
+      { id: 97, word1: "Sekretaris", word2: "Sekertaris", answer: "Sekretaris", explanation: "Berasal dari 'secretary', penempatan huruf 'r'-nya adalah setelah huruf 'k'." },
+      { id: 98, word1: "Sontek", word2: "Contek", answer: "Sontek", explanation: "Kata dasarnya adalah 'sontek' (menyontek), bukan 'contek'." },
+      { id: 99, word1: "Standardisasi", word2: "Standarisasi", answer: "Standardisasi", explanation: "Berasal dari kata dasar 'standard' + akhiran '-isasi'. Huruf 'd' di tengah harus ikut." },
+      { id: 100, word1: "Tolok ukur", word2: "Tolak ukur", answer: "Tolok ukur", explanation: "Berasal dari kata 'tolok' yang berarti bandingan/timbangan. Jadi yang benar adalah tolok ukur." },
+      { id: 101, word1: "Tepercaya", word2: "Terpercaya", answer: "Tepercaya", explanation: "Awalan ter- bertemu kata berawalan 'per-' (percaya) huruf 'r'-nya luluh menjadi te-." },
+      { id: 102, word1: "Memengaruhi", word2: "Mempengaruhi", answer: "Memengaruhi", explanation: "Kata dasar 'pengaruh' diawali P. Menurut aturan K-P-T-S, huruf P luluh menjadi 'm'." },
+      { id: 103, word1: "Memercayai", word2: "Mempercayai", answer: "Memercayai", explanation: "Kata dasar 'percaya' diawali P. Huruf P akan luluh menjadi 'm'." },
+      { id: 104, word1: "Memedulikan", word2: "Mempedulikan", answer: "Memedulikan", explanation: "Kata dasar 'peduli' (P). Luluh menjadi 'm' saat bertemu awalan me-." },
+      { id: 105, word1: "Memosisikan", word2: "Memposisikan", answer: "Memosisikan", explanation: "Kata dasar 'posisi' (P). Luluh menjadi 'm' saat bertemu awalan me-." },
+      { id: 106, word1: "Memopulerkan", word2: "Mempopulerkan", answer: "Memopulerkan", explanation: "Kata dasar 'populer' (P). Luluh menjadi 'm' saat bertemu awalan me-." },
+      { id: 107, word1: "Memublikasikan", word2: "Mempublikasikan", answer: "Memublikasikan", explanation: "Kata dasar 'publikasi' (P). Luluh menjadi 'm' saat bertemu awalan me-." },
+      { id: 108, word1: "Memproklamasikan", word2: "Memroklamasikan", answer: "Memproklamasikan", explanation: "Pengecualian K-P-T-S: Kata berawalan P yang diikuti konsonan lain 'r' (kluster pr) TIDAK luluh." },
+      { id: 109, word1: "Memproduksi", word2: "Memroduksi", answer: "Memproduksi", explanation: "Sama seperti proklamasi, kluster 'pr' pada 'produksi' membuat huruf P tidak luluh." },
+      { id: 110, word1: "Memprotes", word2: "Memrotes", answer: "Memprotes", explanation: "Kata dasar 'protes' (kluster pr), sehingga huruf P tidak luluh." },
+      { id: 111, word1: "Mengonsumsi", word2: "Mengkonsumsi", answer: "Mengonsumsi", explanation: "Kata dasar 'konsumsi' (K). Menurut aturan K-P-T-S, huruf K luluh menjadi 'ng'." },
+      { id: 112, word1: "Mengomunikasikan", word2: "Mengkomunikasikan", answer: "Mengomunikasikan", explanation: "Kata dasar 'komunikasi' (K). Luluh menjadi 'ng'." },
+      { id: 113, word1: "Mengoordinasikan", word2: "Mengkoordinasikan", answer: "Mengoordinasikan", explanation: "Kata dasar 'koordinasi' (K). Luluh menjadi 'ng'." },
+      { id: 114, word1: "Mengategorikan", word2: "Mengkategorikan", answer: "Mengategorikan", explanation: "Kata dasar 'kategori' (K). Luluh menjadi 'ng'." },
+      { id: 115, word1: "Mengkristal", word2: "Mengristal", answer: "Mengkristal", explanation: "Pengecualian: Kata dasar 'kristal' memiliki konsonan ganda 'kr', sehingga K tidak luluh." },
+      { id: 116, word1: "Mengklasifikasi", word2: "Menglasifikasi", answer: "Mengklasifikasi", explanation: "Sama seperti kristal, kluster 'kl' membuat K tidak luluh." },
+      { id: 117, word1: "Mengkritik", word2: "Mengritik", answer: "Mengkritik", explanation: "Kata dasar 'kritik'. Kluster 'kr' membuat K tidak luluh." },
+      { id: 118, word1: "Menyosialisasikan", word2: "Mensosialisasikan", answer: "Menyosialisasikan", explanation: "Kata dasar 'sosialisasi' (S). Menurut aturan K-P-T-S, huruf S luluh menjadi 'ny'." },
+      { id: 119, word1: "Menyukseskan", word2: "Mensukseskan", answer: "Menyukseskan", explanation: "Kata dasar 'sukses' (S). Luluh menjadi 'ny'." },
+      { id: 120, word1: "Menyintesis", word2: "Mensintesis", answer: "Menyintesis", explanation: "Kata dasar 'sintesis' (S). Luluh menjadi 'ny'." },
+      { id: 121, word1: "Mensyukuri", word2: "Menyukuri", answer: "Mensyukuri", explanation: "Pengecualian! Kata dasar berawalan gabungan konsonan 'sy' (syukur) TIDAK luluh." },
+      { id: 122, word1: "Mensyaratkan", word2: "Menyaratkan", answer: "Mensyaratkan", explanation: "Sama seperti syukur, awalan 'sy' pada 'syarat' tidak luluh." },
+      { id: 123, word1: "Menerjemahkan", word2: "Menterjemahkan", answer: "Menerjemahkan", explanation: "Kata dasar 'terjemah' (T). Menurut aturan K-P-T-S, huruf T luluh menjadi 'n'." },
+      { id: 124, word1: "Menertawakan", word2: "Mentertawakan", answer: "Menertawakan", explanation: "Kata dasar 'tertawa' (T). Luluh menjadi 'n'." },
+      { id: 125, word1: "Menerapkan", word2: "Menterapkan", answer: "Menerapkan", explanation: "Kata dasar 'terap' (T). Luluh menjadi 'n'." },
+      { id: 126, word1: "Memfasilitasi", word2: "Mefasilitasi", answer: "Memfasilitasi", explanation: "Huruf F dan V pada kata serapan bahasa asing TIDAK luluh saat diberi awalan me-." },
+      { id: 127, word1: "Memvonis", word2: "Mevonis", answer: "Memvonis", explanation: "Sama seperti F, awalan V pada 'vonis' juga tidak luluh." },
+      { id: 128, word1: "Memfitnah", word2: "Mefitnah", answer: "Memfitnah", explanation: "Kata 'fitnah' mempertahankan huruf F-nya, menjadi memfitnah." },
+      { id: 129, word1: "Mempunyai", word2: "Memunyai", answer: "Mempunyai", explanation: "Pengecualian sejarah! Walaupun berawalan P (punya), kata ini ditetapkan baku dengan tetap memakai P." },
+      { id: 130, word1: "Mempelajari", word2: "Memelajari", answer: "Mempelajari", explanation: "Berasal dari ajar + pe- = pelajar. Kata dasar 'pelajar' P-nya tidak luluh karena 'pe' adalah imbuhan, bukan huruf asli." },
+      { id: 131, word1: "Mempertahankan", word2: "Memertahankan", answer: "Mempertahankan", explanation: "Berasal dari tahan + per-. P tidak luluh karena 'per-' di sini adalah imbuhan sisipan." },
+      { id: 132, word1: "Mengilat", word2: "Mengkilat", answer: "Mengilat", explanation: "Kata dasar 'kilat' (K). Luluh menjadi 'ng'." },
+      { id: 133, word1: "Mengait", word2: "Mengkait", answer: "Mengait", explanation: "Kata dasar 'kait' (K). Luluh menjadi 'ng'." },
+      { id: 134, word1: "Mencuci", word2: "Menyuci", answer: "Mencuci", explanation: "Hanya K, P, T, S yang luluh. Huruf C tidak luluh. Tetap mencuci, bukan menyuci." },
+      { id: 135, word1: "Mencintai", word2: "Menyintai", answer: "Mencintai", explanation: "Huruf C pada 'cinta' tidak luluh. Menjadi mencintai." },
+      { id: 136, word1: "Mencolok", word2: "Menyolok", answer: "Mencolok", explanation: "Kata dasarnya 'colok'. C tidak luluh, sehingga tetap mencolok." },
+      { id: 137, word1: "Menyontek", word2: "Mencontek", answer: "Menyontek", explanation: "Kata dasarnya adalah 'sontek' (S). Maka luluh menjadi 'ny' (menyontek)." },
+      { id: 138, word1: "Mengebom", word2: "Membom", answer: "Mengebom", explanation: "Kata dasar yang hanya punya 1 suku kata (bom, cat, tik) akan mendapat awalan 'menge-'." },
+      { id: 139, word1: "Mengecat", word2: "Mencat", answer: "Mengecat", explanation: "Sama seperti bom, kata 1 suku kata (cat) ditambah awalan 'menge-'." },
+      { id: 140, word1: "Mengetik", word2: "Mentik", answer: "Mengetik", explanation: "Berasal dari kata dasar 1 suku kata 'tik'." },
+      { id: 141, word1: "Mengeklik", word2: "Mengklik", answer: "Mengeklik", explanation: "Berasal dari kata dasar 1 suku kata 'klik'." },
+      { id: 142, word1: "Mengetes", word2: "Mentes", answer: "Mengetes", explanation: "Berasal dari kata dasar 1 suku kata 'tes'." },
+      { id: 143, word1: "Perusak", word2: "Pengrusak", answer: "Perusak", explanation: "Kata dasar berawalan R (rusak) jika diberi awalan pe- menjadi pe+rusak (perusak)." },
+      { id: 144, word1: "Perajin", word2: "Pengrajin", answer: "Perajin", explanation: "Berasal dari pe+rajin. Tidak ada bunyi 'ng', tetap perajin." },
+      { id: 145, word1: "Pegolf", word2: "Penggolf", answer: "Pegolf", explanation: "Berawalan konsonan g, cukup pakai pe- (pegolf)." },
+      { id: 146, word1: "Petinju", word2: "Peninju", answer: "Petinju", explanation: "Untuk profesi atau atlet olahraga (tinju), imbuhan yang tepat adalah pe- (petinju)." },
+      { id: 147, word1: "Permukiman", word2: "Pemukiman", answer: "Permukiman", explanation: "Imbuhan per-an (permukiman) menyatakan tempat/lokasi. Pem-an menyatakan proses." },
+      { id: 148, word1: "Perdesaan", word2: "Pedesaan", answer: "Perdesaan", explanation: "Berasal dari desa + konfiks per-an. Menjadi perdesaan." },
+      { id: 149, word1: "Perkotaan", word2: "Pekotaan", answer: "Perkotaan", explanation: "Sama seperti perdesaan, berasal dari kota + konfiks per-an." },
+      { id: 150, word1: "Pertanggungjawaban", word2: "Pertanggung jawaban", answer: "Pertanggungjawaban", explanation: "Aturan konfiks: Jika dua kata dasar mendapat awalan dan akhiran sekaligus, wajib ditulis serangkai." },
+      { id: 151, word1: "Menandatangani", word2: "Menanda tangani", answer: "Menandatangani", explanation: "Mendapat konfiks me-i sekaligus, jadi 'tanda tangan' ditulis serangkai tanpa spasi." },
+      { id: 152, word1: "Menggarisbawahi", word2: "Menggaris bawahi", answer: "Menggarisbawahi", explanation: "Mendapat konfiks me-i sekaligus, jadi 'garis bawah' ditulis serangkai." },
+      { id: 153, word1: "Menghancurleburkan", word2: "Menghancur leburkan", answer: "Menghancurleburkan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 154, word1: "Menyebarluaskan", word2: "Menyebar luaskan", answer: "Menyebarluaskan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 155, word1: "Memutarbalikkan", word2: "Memutar balikkan", answer: "Memutarbalikkan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 156, word1: "Memberitahukan", word2: "Memberi tahukan", answer: "Memberitahukan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 157, word1: "Menganaktirikan", word2: "Menganak tirikan", answer: "Menganaktirikan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 158, word1: "Melipatgandakan", word2: "Melipat gandakan", answer: "Melipatgandakan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 159, word1: "Mengambinghitamkan", word2: "Mengambing hitamkan", answer: "Mengambinghitamkan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 160, word1: "Mengalihbahasakan", word2: "Mengalih bahasakan", answer: "Mengalihbahasakan", explanation: "Mendapat konfiks me-kan sekaligus, wajib ditulis serangkai." },
+      { id: 161, word1: "Dipertanggungjawabkan", word2: "Dipertanggung jawabkan", answer: "Dipertanggungjawabkan", explanation: "Mendapat konfiks di-kan (bentuk pasif), dua kata dasar wajib digabung." },
+      { id: 162, word1: "Disebarluaskan", word2: "Disebar luaskan", answer: "Disebarluaskan", explanation: "Mendapat konfiks di-kan, wajib digabung." },
+      { id: 163, word1: "Dianaktirikan", word2: "Di anak tirikan", answer: "Dianaktirikan", explanation: "Mendapat konfiks di-kan, wajib digabung." },
+      { id: 164, word1: "Diberitahukan", word2: "Diberi tahukan", answer: "Diberitahukan", explanation: "Mendapat konfiks di-kan, wajib digabung." },
+      { id: 165, word1: "Dialihbahasakan", word2: "Dialih bahasakan", answer: "Dialihbahasakan", explanation: "Mendapat konfiks di-kan, wajib digabung." },
+      { id: 166, word1: "Ketidakhadiran", word2: "Ketidak hadiran", answer: "Ketidakhadiran", explanation: "Mendapat konfiks ke-an sekaligus, wajib ditulis serangkai." },
+      { id: 167, word1: "Ketidakadilan", word2: "Ketidak adilan", answer: "Ketidakadilan", explanation: "Mendapat konfiks ke-an sekaligus, wajib ditulis serangkai." },
+      { id: 168, word1: "Kesiapsiagaan", word2: "Kesiap siagaan", answer: "Kesiapsiagaan", explanation: "Mendapat konfiks ke-an sekaligus, wajib ditulis serangkai." },
+      { id: 169, word1: "Ketertinggalan", word2: "Ke tertinggalan", answer: "Ketertinggalan", explanation: "Mendapat konfiks ke-an, awalan ke- digabung penuh." },
+      { id: 170, word1: "Keterlaluan", word2: "Ke terlaluan", answer: "Keterlaluan", explanation: "Mendapat konfiks ke-an, digabung penuh." },
+      { id: 171, word1: "Berterima kasih", word2: "Berterimakasih", answer: "Berterima kasih", explanation: "Aturan awalan: Jika hanya mendapat awalan ber- (tanpa akhiran), kata kedua tetap dipisah." },
+      { id: 172, word1: "Bertanggung jawab", word2: "Bertanggungjawab", answer: "Bertanggung jawab", explanation: "Hanya mendapat awalan ber-, sehingga kata kedua 'jawab' wajib dipisah." },
+      { id: 173, word1: "Bekerja sama", word2: "Bekerjasama", answer: "Bekerja sama", explanation: "Hanya mendapat awalan be-, kata kedua 'sama' tetap dipisah." },
+      { id: 174, word1: "Berlipat ganda", word2: "Berlipatganda", answer: "Berlipat ganda", explanation: "Hanya mendapat awalan ber-, dipisah." },
+      { id: 175, word1: "Tepuk tangan", word2: "Tepuktangan", answer: "Tepuk tangan", explanation: "Dua kata dasar terpisah, tidak digabung jika tidak ada konfiks/imbuhan gabung." },
+      { id: 176, word1: "Bertepuk tangan", word2: "Bertepuktangan", answer: "Bertepuk tangan", explanation: "Hanya mendapat awalan, tetap dipisah." },
+      { id: 177, word1: "Beraneka ragam", word2: "Beranekaragam", answer: "Beraneka ragam", explanation: "Hanya mendapat awalan, tetap dipisah." },
+      { id: 178, word1: "Ikut serta", word2: "Ikutserta", answer: "Ikut serta", explanation: "Tanpa imbuhan konfiks, frasa ini tetap ditulis terpisah." },
+      { id: 179, word1: "Bekerja", word2: "Berkerja", answer: "Bekerja", explanation: "Aturan luluh r: Awalan ber- bertemu kata dengan suku pertama 'er' (kerja), maka r-nya luluh." },
+      { id: 180, word1: "Beternak", word2: "Berternak", answer: "Beternak", explanation: "Sama seperti bekerja, ber + ternak luluh menjadi beternak." },
+      { id: 181, word1: "Beragam", word2: "Berragam", answer: "Beragam", explanation: "Awalan ber- bertemu kata awalan R (ragam), cukup ditulis satu R saja (lebur)." },
+      { id: 182, word1: "Berevolusi", word2: "Berrevolusi", answer: "Berevolusi", explanation: "Kata dasarnya evolusi (huruf E). Jadi ber- + evolusi = berevolusi." },
+      { id: 183, word1: "Beresolusi", word2: "Berresolusi", answer: "Beresolusi", explanation: "Kata dasar resolusi (huruf R). Huruf R-nya melebur jadi satu (beresolusi)." },
+      { id: 184, word1: "Terekam", word2: "Terrekam", answer: "Terekam", explanation: "Sama seperti ber-, awalan ter- bertemu huruf R (rekam), R-nya melebur jadi satu." },
+      { id: 185, word1: "Terasa", word2: "Terrasa", answer: "Terasa", explanation: "Awalan ter- bertemu huruf R (rasa), R-nya melebur jadi satu." },
+      { id: 186, word1: "Tepercik", word2: "Terpercik", answer: "Tepercik", explanation: "Awalan ter- bertemu kata dengan suku kata pertama 'per' (percik), r-nya luluh jadi te-." },
+      { id: 187, word1: "Teperdaya", word2: "Terperdaya", answer: "Teperdaya", explanation: "Awalan ter- bertemu kata 'perdaya', r-nya luluh jadi te-." },
+      { id: 188, word1: "Telanjur", word2: "Terlanjur", answer: "Telanjur", explanation: "Bentuk baku yang ditetapkan KBBI. Mengikuti pola luluh khusus menjadi telanjur." },
+      { id: 189, word1: "Menertibkan", word2: "Mentertibkan", answer: "Menertibkan", explanation: "Kata dasar 'tertib' (T). T luluh menjadi 'n' (menertibkan)." },
+      { id: 190, word1: "Minimalisasi", word2: "Minimalisir", answer: "Minimalisasi", explanation: "Akhiran serapan (Belanda -ir vs Inggris -asi). Yang dibakukan di Indonesia adalah '-asi'." },
+      { id: 191, word1: "Optimalisasi", word2: "Optimalisir", answer: "Optimalisasi", explanation: "Menggunakan akhiran '-asi', menjadi optimalisasi." },
+      { id: 192, word1: "Netralisasi", word2: "Netralisir", answer: "Netralisasi", explanation: "Menggunakan akhiran '-asi', menjadi netralisasi." },
+      { id: 193, word1: "Lokalisasi", word2: "Lokalisir", answer: "Lokalisasi", explanation: "Menggunakan akhiran '-asi', menjadi lokalisasi." },
+      { id: 194, word1: "Dimengerti", word2: "Di mengerti", answer: "Dimengerti", explanation: "'di-' di sini adalah imbuhan pembentuk pasif (lawan mengerti), sehingga wajib digabung." },
+      { id: 195, word1: "Dimakan", word2: "Di makan", answer: "Dimakan", explanation: "Sama seperti dimengerti, 'di-' adalah imbuhan pembentuk kata kerja pasif." },
+      { id: 196, word1: "Di mana", word2: "Dimana", answer: "Di mana", explanation: "Aturan preposisi: 'di' sebagai kata penunjuk tempat adalah kata depan, wajib dipisah." },
+      { id: 197, word1: "Di atas", word2: "Diatas", answer: "Di atas", explanation: "Penunjuk tempat (atas). Kata depan 'di' wajib dipisah." },
+      { id: 198, word1: "Di antaranya", word2: "Diantaranya", answer: "Di antaranya", explanation: "Kata depan 'di' menunjukkan letak/posisi, wajib dipisah." },
+      { id: 199, word1: "Ke mana", word2: "Kemana", answer: "Ke mana", explanation: "Sama seperti 'di mana', 'ke' di sini adalah preposisi penunjuk arah, wajib dipisah." },
+      { id: 200, word1: "Kemari", word2: "Ke mari", answer: "Kemari", explanation: "Pengecualian khusus! Meski 'ke' dipisah untuk arah, frasa 'kemari' wajib digabung menurut KBBI." },
+      { id: 201, word1: "Abjad", word2: "Abjat", answer: "Abjad", explanation: "Penulisan baku menggunakan huruf 'd' di akhir kata." },
+      { id: 202, word1: "Afdal", word2: "Afdol", answer: "Afdal", explanation: "Diserap dari bahasa Arab, penulisan bakunya menggunakan huruf 'a'." },
+      { id: 203, word1: "Akhlak", word2: "Ahlak", answer: "Akhlak", explanation: "Kata baku dari bahasa Arab ini harus menggunakan gabungan huruf 'kh'." },
+      { id: 204, word1: "Ambeien", word2: "Ambeyen", answer: "Ambeien", explanation: "Kata bakunya ditulis dengan huruf 'i' dan 'e', tanpa huruf 'y'." },
+      { id: 205, word1: "Al-Qur'an", word2: "Alquran", answer: "Al-Qur'an", explanation: "Menurut standar KBBI, penulisan kitab suci ini menggunakan tanda hubung dan apostrof." },
+      { id: 206, word1: "Atmosfer", word2: "Atmosfir", answer: "Atmosfer", explanation: "Diserap dari 'atmosphere', akhiran yang benar adalah '-fer', bukan '-fir'." },
+      { id: 207, word1: "Azan", word2: "Adzan", answer: "Azan", explanation: "Penulisan yang baku menurut ejaan bahasa Indonesia menggunakan huruf 'z' saja." },
+      { id: 208, word1: "Bolpoin", word2: "Bolpen", answer: "Bolpoin", explanation: "Diserap dari bahasa Inggris 'ballpoint', disesuaikan menjadi bolpoin." },
+      { id: 209, word1: "Bujet", word2: "Budget", answer: "Bujet", explanation: "Kata serapan dari bahasa Inggris 'budget' sudah disesuaikan ejaannya menjadi bujet." },
+      { id: 210, word1: "Cabai", word2: "Cabe", answer: "Cabai", explanation: "Kata bakunya menggunakan akhiran '-ai' (cabai), bukan '-e' (cabe)." },
+      { id: 211, word1: "Detergen", word2: "Deterjen", answer: "Detergen", explanation: "Huruf 'g' dipertahankan dari kata aslinya (detergent)." },
+      { id: 212, word1: "Ekspor", word2: "Eksport", answer: "Ekspor", explanation: "Diserap tanpa huruf 't' di akhir kata." },
+      { id: 213, word1: "Embus", word2: "Hembus", answer: "Embus", explanation: "Sama seperti utang dan isap, kata ini baku tanpa awalan huruf 'h'." },
+      { id: 214, word1: "Esai", word2: "Esei", answer: "Esai", explanation: "Diserap dari kata 'essay', penulisan yang baku berakhiran '-ai'." },
+      { id: 215, word1: "Gubuk", word2: "Gubug", answer: "Gubuk", explanation: "Penulisan yang benar menurut KBBI berakhiran huruf 'k'." },
+      { id: 216, word1: "Hadis", word2: "Hadist", answer: "Hadis", explanation: "Tidak perlu ada huruf 't' di akhir kata (hadis)." },
+      { id: 217, word1: "Ideologi", word2: "Idiologi", answer: "Ideologi", explanation: "Berasal dari kata 'idea', jadi menggunakan huruf 'e' bukan 'i' di tengahnya." },
+      { id: 218, word1: "Ikhlas", word2: "Ihlas", answer: "Ikhlas", explanation: "Penulisan yang baku harus menyertakan gabungan huruf 'kh'." },
+      { id: 219, word1: "Kanguru", word2: "Kangguru", answer: "Kanguru", explanation: "Sering salah ditulis kangguru (dengan ng-g), yang baku hanya memakai 'ng' (kanguru)." },
+      { id: 220, word1: "Kompleks", word2: "Komplek", answer: "Kompleks", explanation: "Diserap dari 'complex', sehingga harus berakhiran '-ks'." },
+      { id: 221, word1: "Maaf", word2: "Ma'af", answer: "Maaf", explanation: "Dalam ejaan yang disempurnakan, tanda apostrof (') tidak digunakan untuk kata ini." },
+      { id: 222, word1: "Magrib", word2: "Maghrib", answer: "Magrib", explanation: "Sama seperti karisma, gabungan huruf 'gh' cukup ditulis 'g' (magrib)." },
+      { id: 223, word1: "Massal", word2: "Masal", answer: "Massal", explanation: "Diserap dari kata 'mass' (massa), sehingga huruf 's'-nya ganda (massal)." },
+      { id: 224, word1: "Mikraj", word2: "Mi'raj", answer: "Mikraj", explanation: "Tanda apostrof (ain) pada kata serapan Arab sering diganti dengan huruf 'k' dalam penulisan kata turunan atau serapan tertentu, namun Mikraj ditulis gabung." },
+      { id: 225, word1: "Museum", word2: "Musium", answer: "Museum", explanation: "Dipertahankan sesuai bahasa aslinya, menggunakan huruf 'e'." },
+      { id: 226, word1: "Objek", word2: "Obyek", answer: "Objek", explanation: "Ejaan bahasa Indonesia menggunakan huruf 'j' untuk kata serapan 'object'." },
+      { id: 227, word1: "Paspor", word2: "Pasport", answer: "Paspor", explanation: "Sama seperti ekspor, diserap tanpa huruf 't'." },
+      { id: 228, word1: "Peduli", word2: "Perduli", answer: "Peduli", explanation: "Tidak ada huruf 'r' di dalam kata ini. Yang baku adalah peduli." },
+      { id: 229, word1: "Penasihat", word2: "Penasehat", answer: "Penasihat", explanation: "Kata dasarnya nasihat, jika ditambah awalan pe- menjadi penasihat." },
+      { id: 230, word1: "Peranti", word2: "Piranti", answer: "Peranti", explanation: "Bentuk bakunya menggunakan awalan pe- (peranti), bukan pi-." },
+      { id: 231, word1: "Rezeki", word2: "Rejeki", answer: "Rezeki", explanation: "Berasal dari bahasa Arab yang huruf aslinya diserap menjadi huruf 'z'." },
+      { id: 232, word1: "Relief", word2: "Relif", answer: "Relief", explanation: "Dipertahankan ejaan aslinya yang menggunakan gabungan vokal 'ie'." },
+      { id: 233, word1: "Responden", word2: "Respondens", answer: "Responden", explanation: "Diserap menjadi responden (tanpa huruf 's' di akhir)." },
+      { id: 234, word1: "Satai", word2: "Sate", answer: "Satai", explanation: "Sama seperti cabai dan baterai, penulisan bakunya berakhiran '-ai'." },
+      { id: 235, word1: "Saus", word2: "Saos", answer: "Saus", explanation: "Penulisan baku yang terdaftar di KBBI adalah saus (menggunakan 'u')." },
+      { id: 236, word1: "Seprai", word2: "Sprei", answer: "Seprai", explanation: "Mendapat sisipan vokal 'e' di awal dan berakhiran '-ai' (seprai)." },
+      { id: 237, word1: "Sofbol", word2: "Softball", answer: "Sofbol", explanation: "Diserap dan disesuaikan pelafalannya ke dalam ejaan bahasa Indonesia menjadi sofbol." },
+      { id: 238, word1: "Survei", word2: "Survey", answer: "Survei", explanation: "Akhiran '-ey' pada kata aslinya diserap menjadi '-ei' (survei)." },
+      { id: 239, word1: "Syahid", word2: "Sahid", answer: "Syahid", explanation: "Kata serapan dari bahasa Arab ini baku ditulis dengan awalan 'sy'." },
+      { id: 240, word1: "Tafsir", word2: "Tapsir", answer: "Tafsir", explanation: "Huruf 'f' pada kata aslinya tetap dipertahankan (tafsir)." },
+      { id: 241, word1: "Takwa", word2: "Taqwa", answer: "Takwa", explanation: "Huruf 'q' pada serapan Arab umumnya diubah menjadi 'k' dalam bahasa Indonesia." },
+      { id: 242, word1: "Taoge", word2: "Toge", answer: "Taoge", explanation: "Penulisan yang baku menyertakan gabungan vokal 'ao' (taoge)." },
+      { id: 243, word1: "Tarif", word2: "Tarip", answer: "Tarif", explanation: "Kata bakunya diakhiri dengan huruf 'f', bukan 'p'." },
+      { id: 244, word1: "Teladan", word2: "Tauladan", answer: "Teladan", explanation: "Bentuk bakunya adalah teladan, tanpa vokal 'u'." },
+      { id: 245, word1: "Vila", word2: "Villa", answer: "Vila", explanation: "Konsonan ganda ('ll') disederhanakan menjadi konsonan tunggal ('l')." },
+      { id: 246, word1: "Grup", word2: "Group", answer: "Grup", explanation: "Kata serapan ini sudah disesuaikan ejaannya menjadi grup." },
+      { id: 247, word1: "Definisi", word2: "Defenisi", answer: "Definisi", explanation: "Diserap dari 'definition', vokal di tengah yang benar adalah 'i', bukan 'e'." },
+      { id: 248, word1: "Hakikat", word2: "Hakekat", answer: "Hakikat", explanation: "Diserap dari bahasa Arab, penulisan bakunya menggunakan huruf 'i'." },
+      { id: 249, word1: "Khatam", word2: "Katam", answer: "Khatam", explanation: "Harus memakai awalan 'kh' untuk mempertahankan makna aslinya dari bahasa Arab." },
+      { id: 250, word1: "Manajer", word2: "Manager", answer: "Manajer", explanation: "Sama seperti manajemen, huruf 'g' yang dibaca 'j' diserap menjadi huruf 'j'." }
+    ];
+
+    // --- Komponen Utama ---
+    function App() {
+      const [flashcards, setFlashcards] = useState([...initialFlashcards]);
+      const [currentIndex, setCurrentIndex] = useState(0);
+      const [isFlipped, setIsFlipped] = useState(false);
+      const [direction, setDirection] = useState(''); 
+
+      const handleNext = useCallback(() => {
+        setIsFlipped(false);
+        setDirection('right');
+        setTimeout(() => {
+          setCurrentIndex((prev) => (prev + 1) % flashcards.length);
+          setDirection('');
+        }, 150);
+      }, [flashcards.length]);
+
+      const handlePrev = useCallback(() => {
+        setIsFlipped(false);
+        setDirection('left');
+        setTimeout(() => {
+          setCurrentIndex((prev) => (prev - 1 + flashcards.length) % flashcards.length);
+          setDirection('');
+        }, 150);
+      }, [flashcards.length]);
+
+      const handleShuffle = () => {
+        setIsFlipped(false);
+        setDirection('down');
+        setTimeout(() => {
+          const shuffled = [...flashcards].sort(() => Math.random() - 0.5);
+          setFlashcards(shuffled);
+          setCurrentIndex(0);
+          setDirection('');
+        }, 150);
+      };
+
+      const handleReset = () => {
+        setIsFlipped(false);
+        setFlashcards([...initialFlashcards]);
+        setCurrentIndex(0);
+      };
+
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (e.key === 'ArrowRight') handleNext();
+          if (e.key === 'ArrowLeft') handlePrev();
+          if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            setIsFlipped((prev) => !prev);
+          }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [handleNext, handlePrev]);
+
+      const currentCard = flashcards[currentIndex];
+      const progress = ((currentIndex + 1) / flashcards.length) * 100;
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 px-4 font-sans text-slate-800">
+          <div className="max-w-2xl w-full text-center mb-8">
+            <div className="inline-flex items-center justify-center p-3 bg-indigo-100 rounded-full mb-4 text-indigo-600">
+              <BookOpen size={32} />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">
+              Flashcard PPU UTBK
+            </h1>
+            <p className="text-slate-500">
+              Latihan tebak kata baku & tidak baku. Klik kartu atau tekan Spasi untuk membalik.
+            </p>
+          </div>
+
+          <div className="max-w-xl w-full mb-8">
+            <div className="flex justify-between text-sm font-medium text-slate-500 mb-2">
+              <span>Kartu {currentIndex + 1} dari {flashcards.length}</span>
+              <span>{Math.round(progress)}% Selesai</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2.5">
+              <div 
+                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out" 
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+          </div>
+
+          <div className="max-w-xl w-full perspective-1000 mb-10 h-80 relative">
+            <div 
+              onClick={() => setIsFlipped(!isFlipped)}
+              className={`w-full h-full relative cursor-pointer transition-all duration-500 ease-in-out`}
+              style={{ 
+                perspective: '1000px',
+                transform: direction === 'right' ? 'translateX(20px) opacity(0)' : direction === 'left' ? 'translateX(-20px) opacity(0)' : direction === 'down' ? 'translateY(20px) opacity(0)' : 'none',
+                opacity: direction ? 0 : 1
+              }}
+            >
+              <div 
+                className="w-full h-full absolute top-0 left-0 transition-transform duration-500 ease-in-out"
+                style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+              >
+                
+                <div 
+                  className="absolute w-full h-full bg-white rounded-3xl shadow-lg border border-slate-100 flex flex-col items-center justify-center p-8 text-center hover:shadow-xl transition-shadow"
+                  style={{ backfaceVisibility: 'hidden' }}
+                >
+                  <span className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-6">Manakah yang baku?</span>
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 w-full">
+                    <span className="text-3xl md:text-4xl font-bold text-slate-800 break-words">{currentCard.word1}</span>
+                    <span className="text-xl font-medium text-slate-400 italic">atau</span>
+                    <span className="text-3xl md:text-4xl font-bold text-slate-800 break-words">{currentCard.word2}</span>
+                  </div>
+                  <div className="absolute bottom-6 text-sm text-slate-400 animate-pulse flex items-center gap-2">
+                    <RotateCcw size={16} /> Klik untuk melihat jawaban
+                  </div>
+                </div>
+
+                <div 
+                  className="absolute w-full h-full bg-indigo-600 rounded-3xl shadow-lg flex flex-col items-center justify-center p-8 text-center"
+                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                >
+                  <div className="bg-white/20 p-2 rounded-full mb-4">
+                    <CheckCircle2 size={32} className="text-white" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-indigo-200 mb-2">Jawaban Benar</span>
+                  <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-6 tracking-wide">
+                    {currentCard.answer}
+                  </h2>
+                  <div className="w-16 h-1 bg-indigo-400 rounded mb-6"></div>
+                  <p className="text-indigo-100 text-lg md:text-xl font-medium max-w-md leading-relaxed overflow-y-auto">
+                    {currentCard.explanation}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-4 md:gap-6 w-full max-w-xl">
+            <button onClick={handlePrev} className="p-4 rounded-full bg-white text-slate-600 shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" title="Sebelumnya (Panah Kiri)">
+              <ArrowLeft size={24} />
+            </button>
+            <button onClick={handleShuffle} className="flex items-center gap-2 px-6 py-4 rounded-full bg-white text-slate-600 shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" title="Acak Urutan">
+              <Shuffle size={20} />
+              <span className="hidden sm:inline">Acak Kartu</span>
+            </button>
+            <button onClick={handleNext} className="p-4 rounded-full bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" title="Selanjutnya (Panah Kanan)">
+              <ArrowRight size={24} />
+            </button>
+          </div>
+
+          <div className="mt-12 text-center text-sm text-slate-400 max-w-md">
+            <p>Gunakan tombol <kbd className="px-2 py-1 bg-slate-200 rounded text-slate-600 mx-1">Spasi</kbd> untuk membalik kartu dan <kbd className="px-2 py-1 bg-slate-200 rounded text-slate-600 mx-1">←</kbd> <kbd className="px-2 py-1 bg-slate-200 rounded text-slate-600 mx-1">→</kbd> untuk navigasi cepat.</p>
+            <button onClick={handleReset} className="mt-4 text-indigo-500 hover:text-indigo-600 underline underline-offset-4 decoration-indigo-200">
+              Reset ke Urutan Awal
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Render ke layar
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
